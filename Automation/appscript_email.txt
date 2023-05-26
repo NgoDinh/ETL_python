@@ -1,0 +1,133 @@
+function getRep(){
+  var dateRanges = getDateData()
+  var finalList = []
+  for (var z=0; z < dateRanges.length; z++){
+    var after = dateRanges[z][0]
+    Logger.log(after)
+    var before = dateRanges[z][1]
+    Logger.log(before)
+    var querry = "after:"+after+" before:"+before
+    var threads = GmailApp.search(querry)
+    // getInboxThreads();
+    if(threads.length > 0){
+      for (var i = 0; i < threads.length; i++) {
+        var title = threads[i].getFirstMessageSubject()
+        // if (title != null){
+      // }
+          if ((title != null)){
+            // Logger.log(title)
+            var thisThread = threads[i]
+            var messages = thisThread.getMessages();
+            var messageCount = thisThread.getMessageCount()
+            var lastMessage = messages[messageCount - 1]
+            var content = lastMessage.getPlainBody()
+            var sender = lastMessage.getFrom()
+            // if (sender.indexOf("foody") < 0){
+              thisThread.markRead()
+              var titleCheck = title.substr(0,63).split(" ").join("").replace(/\s/g, "").toLowerCase()
+              var tmpTitle1 = "HỢP ĐỒNG NOWFOOD"
+              var title1 = tmpTitle1.split(" ").join("").replace(/\s/g, "").toLowerCase()
+              var tmpTitle2 = "HỢP ĐỒNG NOWFOOD VÀ VÍ NOWMERCHANT WALLET"
+              var title2 = tmpTitle2.split(" ").join("").replace(/\s/g, "").toLowerCase()
+              var tmpTitle3 = "HỢP ĐỒNG NOWFOOD VÀ GÓI HỖ TRỢ QUÁN MỚI"
+              var title3 = tmpTitle3.split(" ").join("").replace(/\s/g, "").toLowerCase()
+              var tmpTitle4 = "HỢP ĐỒNG NOWFOOD, VÍ NOWMERCHANT WALLET VÀ GÓI HỖ TRỢ QUÁN MỚI"
+              var title4 = tmpTitle4.split(" ").join("").replace(/\s/g, "").toLowerCase()
+
+              var tmpConfirm1 = 'Tôi xác nhận rằng tôi đã đọc, đồng ý và chịu sự ràng buộc với tất cả các điều khoản và điều kiện tại email trên và tại Hợp đồng được đính kèm. Tôi cũng đồng ý với mức Phí hoa hồng là 25%. Việc tôi đồng ý xác nhận Hợp đồng qua email sẽ có giá trị ràng buộc giữa tôi và Công ty Cổ phần Foody (chủ sở hữu Sàn Now) như một Hợp đồng bằng văn bản đã được ký'
+              var tmpConfirm2 = "Tôi xác nhận rằng tôi đã đọc, đồng ý và chịu sự ràng buộc với tất cả các điều khoản và điều kiện tại email trên và tại Hợp đồng được đính kèm. Tôi cũng đồng ý với mức Phí hoa hồng là 25%. Việc tôi đồng ý xác nhận Hợp đồng & Phụ lục qua email sẽ có giá trị ràng buộc giữa tôi và Công ty Cổ phần Foody (chủ sở hữu Sàn Now) như một Hợp đồng bằng văn bản đã được ký"
+              var tmpConfirm3 = "Tôi xác nhận rằng tôi đã đọc, đồng ý và chịu sự ràng buộc với tất cả các điều khoản và điều kiện tại email trên và tại Hợp đồng được đính kèm. Tôi cũng đồng ý với mức Phí hoa hồng là 25%. Việc tôi đồng ý xác nhận Hợp đồng & Phụ lục qua email sẽ có giá trị ràng buộc giữa tôi và Công ty Cổ phần Foody (chủ sở hữu Sàn Now) như một Hợp đồng bằng văn bản đã được ký"
+              var tmpConfirm4 = "Tôi xác nhận rằng tôi đã đọc, đồng ý và chịu sự ràng buộc với tất cả các điều khoản và điều kiện tại email trên và tại Hợp đồng được đính kèm. Tôi cũng đồng ý với mức Phí hoa hồng là 25%. Việc tôi đồng ý xác nhận Hợp đồng & Phụ lục qua email sẽ có giá trị ràng buộc giữa tôi và Công ty Cổ phần Foody (chủ sở hữu Sàn Now) như một Hợp đồng bằng văn bản đã được ký"
+              var confirm1 = tmpConfirm1.split(" ").join("").replace(/\s/g, "").toLowerCase()
+              var confirm2 = tmpConfirm2.split(" ").join("").replace(/\s/g, "").toLowerCase()
+              var confirm3 = tmpConfirm3.split(" ").join("").replace(/\s/g, "").toLowerCase()
+              var confirm4 = tmpConfirm4.split(" ").join("").replace(/\s/g, "").toLowerCase()
+              var last = content.split(" ").join("").replace(/\s/g, "").replace(/\>+/g, "").substr(0,400).toLowerCase()
+
+              var check = (last.includes(confirm4)&&titleCheck.includes(title4))||(last.includes(confirm3)&&titleCheck.includes(title3))||(last.includes(confirm2)&&titleCheck.includes(title2))||(last.includes(confirm1)&&titleCheck.includes(title1)&&(titleCheck.indexOf("và")==-1))
+              // if (messageCount > 1){
+                var tmpList = []
+                tmpList.push(title)
+                tmpList.push(sender)
+                tmpList.push(messageCount)
+                tmpList.push(content)
+                // tmpList.push(content.substr(0,400))
+                // tmpList.push(last)
+                if (title.split("_")[1] != null){
+                  var mexName = title.split("_")[1].split(" ").join("").replace(/\s/g, "").replaceAll("amp;","").replaceAll("&apos;","'").toLowerCase()
+                }
+                else {
+                  var mexName = ''
+                }
+                tmpList.push(mexName)
+                tmpList.push(check)
+                finalList.push(tmpList)
+            // }
+          // }
+        }
+      }
+    }  
+  }
+  var ss = SpreadsheetApp.getActive()
+  var sheet = ss.getSheetByName('rawrep')
+  sheet.clear()
+  sheet.getRange(2,1,finalList.length, finalList[0].length).setValues(finalList)
+  sheet.setRowHeightsForced(2,finalList.length,21)
+}
+String.prototype.replaceAll = function(search, replacement) {
+        var target = this;
+        return target.replace(new RegExp(search, 'g'), replacement);
+};
+// function test(){
+//   // var tmpTitle4 = "*tôixácnhậnrằngtôiđãđọc,đồngývàchịusựràngbuộcvớitấtcả>cácđiềukhoảnvàđiềukiệntạiemailtrênvàtạihợpđồngđượcđínhkèm.>tôicũngđồngývớimứcphíhoahồnglà25%.việctôiđồngýxácnhậnhợp>đồng&phụlụcquaemailsẽcógiátrịràngbuộcgiữatôivàcôngtycổ>phầnfoody(chủsởhữusànnow)nhưmộthợpđồngbằngvănbảnđãđượcký.*>"
+//   // var tmp = tmpTitle4.toString().replace(/\>+/g, "")
+//   // Logger.log(tmp)
+//   Logger.log(MailApp.getRemainingDailyQuota())
+// }
+function getRepOutlier(){
+  var threads = GmailApp.getInboxThreads();
+  var finalList = []
+  for (var i = 0; i < threads.length; i++) {
+    var title = threads[i].getFirstMessageSubject()
+    if (title != null){
+  // }
+      if ((title.indexOf("HỢP ĐỒNG NOWFOOD") == -1)){
+        // Logger.log(title)
+        var thisThread = threads[i]
+        var messages = thisThread.getMessages();
+        var messageCount = thisThread.getMessageCount()
+        var lastMessage = messages[messageCount - 1]
+        var content = lastMessage.getPlainBody()
+        var sender = lastMessage.getFrom()
+        if (sender.indexOf("foody") < 0){
+            var tmpList = []
+            tmpList.push(title)
+            tmpList.push(sender)
+            tmpList.push(messageCount)
+            tmpList.push(content)
+            finalList.push(tmpList)
+        }
+      }
+    }  
+  }
+  var ss = SpreadsheetApp.getActive()
+  var sheet = ss.getSheetByName('outlier')
+  sheet.getRange(2,1,finalList.length, finalList[0].length).setValues(finalList)
+  sheet.setRowHeightsForced(2,finalList.length,21)
+}
+
+function getDateData(){
+  // var end = Utilities.formatDate(new Date(), "GMT+7", "MM/dd/yyyy");
+  var end = new Date()
+  var start = new Date('July 29, 2021')
+  final_list = []
+  while ((start < end)){
+    var tmp_list = []
+    tmp_list.push(Utilities.formatDate(start, "GMT+7", "yyyy/M/dd"))
+    var start = new Date(start.getTime() + 1000*60*60*24*1)
+    tmp_list.push(Utilities.formatDate(start, "GMT+7", "yyyy/M/dd"))
+    // var start = new Date(start.getTime() - 1000*60*60*24*1)
+    final_list.push(tmp_list)
+    }
+  return final_list
+}

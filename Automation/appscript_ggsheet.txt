@@ -1,0 +1,590 @@
+//------------------------------------------------setup overall------------------------------------------------------------------------------------------------
+function onOpen( ){
+  SpreadsheetApp.getActiveSpreadsheet().addMenu("Custom", [
+    {name: "Save feedback", functionName:"syncData"},
+    {name: "Create collection", functionName: "updateOneColection"},
+    {name: "Update Multi", functionName: "updatemulti"},
+    {name: "Feedback to BDS", functionName: "feedbackToBd"},
+    {name: "Cleand data", functionName: "clearColleaction"},
+    {name: "Set permission", functionName: "setPer"},
+    {name: "Send to Project", functionName: "sendToProject"}
+  ]);
+};
+// function auto_update(){
+//   var date = parseInt(Utilities.formatDate(new Date(), "GMT+7", "HH"));
+//   var allSheet = SpreadsheetApp.getActive().getSheets()
+//   var len = allSheet.length
+//   var allSheetName = []
+//   for (var i = 0; i < len; i++){
+//     // Logger.log(allSheet[i].getName())
+//     allSheetName.push(allSheet[i].getName())
+//   }
+
+//   var controller = SpreadsheetApp.getActive().getSheetByName("controller").getRange(2,5,10,1).getValues()
+  
+//   Logger.log(controller)
+// }
+//--------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------GET INFORMATION--------------------------------------------------------
+// get sheet name (just collection sheets) and BD link
+function getAllCollection1(){
+  var ss = SpreadsheetApp.getActive()
+  var allSheet = ss.getSheets()
+  var sheet = ss.getSheetByName('all_schemes')
+  var data = sheet.getRange(2,1,sheet.getLastRow()-1,1).getValues().join().split(',')
+  var listSheet = []
+  for (i = 0; i < allSheet.length; i++){
+    // if(sheet.getRange(i+2,5,1,1).getValue() == ''){
+      if(data.indexOf(allSheet[i].getSheetName())>=0){
+        listSheet.push(allSheet[i].getSheetName())
+      }
+    }
+  // }
+  // return listSheet
+  // Logger.log(listSheet)
+  // listSheet.push("Món Mĩ, Món Âu")
+  // Logger.log(listSheet)
+  return listSheet
+}
+
+function allSheet(){
+  var sheets = SpreadsheetApp.getActive().getSheetByName('controller').getRange(2,3,SpreadsheetApp.getActive().getSheetByName('controller').getLastRow()-1,1).getValues()
+  return sheets
+}
+
+// function trialuser(){
+//   var email = Session.getActiveUser().getEmail()
+//   botAlertRunning(email,1)
+// }
+//----------------------------------------------------------------------------------------------------------------
+//---------------------------------------------UPDATE DATA--------------------------------------------------------
+function updatemulti(){
+  var email = Session.getActiveUser().getEmail()
+  botAlertRunning(email,0)
+  var ss = SpreadsheetApp.getActive()
+  var controllerSheet = ss.getSheetByName("controller")
+  var runningSheet = controllerSheet.getRange(2,7,6,1).getValues()
+  controllerSheet.getRange(1,1,controllerSheet.getLastRow(),1).clear()
+  //------------------------------------------------------------------
+  for (var z = 0; z<6; z++){
+    var name = runningSheet[z][0]
+    if (name != ''){
+      var sheet = ss.getSheetByName(name)
+      if(sheet.getLastRow()>3){sheet.getRange(4,1,sheet.getLastRow(),sheet.getLastColumn()).clear()}
+    }
+  }
+  //--------------------------------prepare------------
+  var sheets = allSheet()
+  for (i = 0; i< sheets.length; i++){
+    var url = sheets[i]
+    Logger.log(url)
+    SpreadsheetApp.getActive().getSheetByName('controller').getRange(i+1,1,1,1).setValue(url)
+    var bdSS = SpreadsheetApp.openByUrl(url)
+    for (var z = 0; z<6; z++){
+      var name = runningSheet[z][0]
+      if (name != ''){
+        Logger.log(name)
+        var bdSheet = bdSS.getSheetByName(name)
+        if (bdSheet!=null){
+          var lrBdSheet = bdSheet.getLastRow()
+          if(lrBdSheet > 3){
+            setFormula(url,bdSheet)
+            autoFill(bdSheet);
+            collect(name, url)
+          }
+        }
+      }  
+    }
+    
+  }
+  //------------------------------------------------------------------
+  for (var z = 0; z<6; z++){
+    var name = runningSheet[z][0]
+    if (name != ''){
+      Logger.log(name)
+      var sheet = ss.getSheetByName(name)
+      fillFormuala(sheet)
+    }
+  }
+  for (var z = 0; z<6; z++){
+    var name = runningSheet[z][0]
+    var schemeSheet = ss.getSheetByName('all_schemes')
+    var schemeLr = schemeSheet.getLastRow()
+    var updateTime = new Date()
+    if (name != ''){
+      for (var t=1; t<=schemeLr; t++){
+        var sName = schemeSheet.getRange(t,1,1,1).getValue()
+        if(sName == name){
+          schemeSheet.getRange(t,7,1,1).setValue(updateTime)
+        }
+      }
+    }
+  }
+  botAlertRunning(email,1)  
+}
+
+function updateOneColection(){
+  var email = Session.getActiveUser().getEmail()
+  botAlertRunning(email,0)
+  var name = Browser.inputBox('Vui lòng điền tên chương trình bạn muốn create data vào ô bên dưới');
+  var ss = SpreadsheetApp.getActive()
+  var sheet = ss.getSheetByName(name)
+  var templateRange = sheet.getRange(1,1,3,sheet.getLastColumn()).getValues()
+  // if(sheet.getLastRow()>3){sheet.getRange(4,1,sheet.getLastRow(),sheet.getLastColumn()).clear()}
+  //--------------------------------prepare------------
+  var sheets = allSheet()
+  var checkNew = 0
+  for (i = 0; i< sheets.length; i++){
+    var url = sheets[i]
+    SpreadsheetApp.getActive().getSheetByName('controller').getRange(i+1,1,1,1).setValue(url)
+    var bdSS = SpreadsheetApp.openByUrl(url)
+    var bdSheet = bdSS.getSheetByName(name)
+    if (bdSheet==null){
+      var bdSheet = ss.getSheetByName('template').copyTo(bdSS).setName(name)
+      bdSheet.getRange(1,1,3,templateRange[0].length).setValues(templateRange)
+      setFormula(url,bdSheet)
+      var checkNew = checkNew + 1
+    }
+    else{
+      bdSheet.getRange(1,1,3,templateRange[0].length).setValues(templateRange)
+    }
+  }
+  if(checkNew> 5){botRemindCreate(name)}
+  fillFormuala(sheet)
+  botAlertRunning(email,1) 
+};
+
+function collect(sheetName, url){
+  var lrDestination = SpreadsheetApp.getActive().getSheetByName(sheetName).getLastRow() + 1
+  var ss = SpreadsheetApp.openByUrl(url)
+  var sheet = ss.getSheetByName(sheetName)
+  var lr = sheet.getLastRow()
+  var range = sheet.getRange(4,1,lr,27).getValues()
+  var filtered = range.filter(function (dataRow) {
+    return dataRow[1] != '';
+  });
+  if (filtered.length > 0){
+    SpreadsheetApp.getActive().getSheetByName(sheetName).getRange(lrDestination,1,filtered.length,filtered[0].length).setValues(filtered)
+  }
+}
+//autofill all blanks row in BDS link before combine in MKT team.
+function autoFill(sheet){
+  sheet.getRange(4,1,1,1).copyTo(sheet.getRange(4,1,sheet.getLastRow()-3,1), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+  sheet.getRange(4,2,1,1).copyTo(sheet.getRange(4,2,sheet.getLastRow()-3,1), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+  sheet.getRange(4,3,1,1).copyTo(sheet.getRange(4,3,sheet.getLastRow()-3,1), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+  sheet.getRange(4,4,1,1).copyTo(sheet.getRange(4,4,sheet.getLastRow()-3,1), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+  sheet.getRange(4,5,1,1).copyTo(sheet.getRange(4,5,sheet.getLastRow()-3,1), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+  sheet.getRange(4,11,1,1).copyTo(sheet.getRange(4,11,sheet.getLastRow()-3,1), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+  sheet.getRange(4,12,1,1).copyTo(sheet.getRange(4,12,sheet.getLastRow()-3,1), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+  sheet.getRange(4,14,1,1).copyTo(sheet.getRange(4,14,sheet.getLastRow()-3,1), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+};
+
+//Need to update to fill data necessary data before store.  (apply for MKT sheet)
+function fillFormuala(sheet){
+  sheet.getRange(4,28,sheet.getLastRow(),5).clear();
+  sheet.getRange("AH3").setValue(sheet.getName());
+  sheet.getRange(4,28,1,1).setFormula("=$AH$3&R4&J4&G4");
+  sheet.getRange(4,28,1,1).copyTo(sheet.getRange(4,28,sheet.getLastRow()-3,1));
+
+  sheet.getRange(4,31,1,1).setFormula('=IFERROR(VLOOKUP(AB4,database!$A:$E,5,0),"")');
+  sheet.getRange(4,31,1,1).copyTo(sheet.getRange(4,31,sheet.getLastRow()-3,1));
+
+  sheet.getRange(4,32,1,1).setFormula('=if(AG4="pass","pass",if(AC4="",AE4,AC4))');
+  sheet.getRange(4,32,1,1).copyTo(sheet.getRange(4,32,sheet.getLastRow()-3,1));
+
+  // sheet.getRange(4,34,1,1).setFormula('=ifna(SUBSTITUTE(address(1,match($AH$3,\'EC - list\'!$1:$1,0)),"$1","")&":"&SUBSTITUTE(address(1,match($AH$3,\'EC - list\'!$1:$1,0)),"$1",""),"$A$1:$A$1")')
+  // var targetColumn = sheet.getRange(4,34,1,1).getValue()
+  // var fm = "=IFERROR(if(COUNTIF('EC - list'!"+targetColumn+',B4)>0,"pass",""),"")'
+  // sheet.getRange(4,33,1,1).setFormula(fm);
+  // sheet.getRange(4,33,1,1).copyTo(sheet.getRange(4,33,sheet.getLastRow()-3,1));
+};
+function setFormula(url,sheet){
+  if(SpreadsheetApp.openByUrl(url).getSpreadsheetLocale()=='en_US'){
+    sheet.getRange('A4').setFormula('=if(iferror(VLOOKUP($B4,exception_daily_data!$D:$H,5;0),"") = "",iferror(VLOOKUP($B4,daily_data!$D:$H,5;0),""), iferror(VLOOKUP($B4,exception_daily_data!$D:$H,5;0),""))');
+    sheet.getRange('B4').setFormula('=if(IFERROR(if($J4<>"",INDEX(exception_daily_data!$D:$D,MATCH($J4,exception_daily_data!$I:$I,0)),$R4),"") = "", IFERROR(if($J4<>"",INDEX(daily_data!$D:$D,MATCH($J4,daily_data!$I:$I,0)),$R4),""),IFERROR(if($J4<>"",INDEX(exception_daily_data!$D:$D,MATCH($J4,exception_daily_data!$I:$I,0)),$R4),""))');
+    sheet.getRange('C4').setFormula('=if(iferror(VLOOKUP(B4,exception_daily_data!$D:$E,2,0),"") = "",iferror(VLOOKUP(B4,daily_data!$D:$E,2,0),""), iferror(VLOOKUP(B4,exception_daily_data!$D:$E,2,0),""))');
+    sheet.getRange('D4').setFormula('=iferror(VLOOKUP(B4,mex_list!$A:$D,2,0),"")');
+    sheet.getRange('E4').setFormula('=iferror(VLOOKUP(B4,mex_list!$A:$D,4,0),"")');
+    sheet.getRange('K4').setFormula('=if(iferror(VLOOKUP($J4,exception_daily_data!$I:$J,2,0),"")="",iferror(VLOOKUP($J4,daily_data!$I:$J,2,0),""), iferror(VLOOKUP($J4,exception_daily_data!$I:$J,2,0),""))');
+    sheet.getRange('L4').setFormula('=if(iferror(VLOOKUP($J4,exception_daily_data!$I:$L,4,0),"") = "",iferror(VLOOKUP($J4,daily_data!$I:$L,4,0),""),iferror(VLOOKUP($J4,exception_daily_data!$I:$L,4,0),""))');
+    sheet.getRange('N4').setFormula('=iferror(1- (M4/L4),"")');
+    }
+  else{
+    sheet.getRange('A4').setFormula('=if(iferror(VLOOKUP($B4;exception_daily_data!$D:$H;5;0);"") = ""; iferror(VLOOKUP($B4;daily_data!$D:$H;5;0);""); iferror(VLOOKUP($B4;exception_daily_data!$D:$H;5;0);""))');
+    sheet.getRange('B4').setFormula('=if(IFERROR(if($J4<>"";INDEX(exception_daily_data!$D:$D;MATCH($J4;exception_daily_data!$I:$I;0));$R4);"") = "";IFERROR(if($J4<>"";INDEX(daily_data!$D:$D;MATCH($J4;daily_data!$I:$I;0));$R4);""); IFERROR(if($J4<>"";INDEX(exception_daily_data!$D:$D;MATCH($J4;exception_daily_data!$I:$I;0));$R4);""))');
+    sheet.getRange('C4').setFormula('=if(iferror(VLOOKUP(B4;exception_daily_data!$D:$E;2;0);"") = ""; iferror(VLOOKUP(B4;daily_data!$D:$E;2;0);""); iferror(VLOOKUP(B4;exception_daily_data!$D:$E;2;0);""))');
+    sheet.getRange('D4').setFormula('=iferror(VLOOKUP(B4;mex_list!$A:$D;2;0);"")');
+    sheet.getRange('E4').setFormula('=iferror(VLOOKUP(B4;mex_list!$A:$D;4;0);"")');
+    sheet.getRange('K4').setFormula('=if(iferror(VLOOKUP($J4;exception_daily_data!$I:$J;2;0);"") = "";iferror(VLOOKUP($J4;daily_data!$I:$J;2;0);""); iferror(VLOOKUP($J4;exception_daily_data!$I:$J;2;0);""))');
+    sheet.getRange('L4').setFormula('=if(iferror(VLOOKUP($J4;exception_daily_data!$I:$L;4;0);"") = "";iferror(VLOOKUP($J4;daily_data!$I:$L;4;0);""); iferror(VLOOKUP($J4;exception_daily_data!$I:$L;4;0);""))');
+    sheet.getRange('N4').setFormula('=iferror(1- (M4/L4);"")');
+    // sheet.getRange('U4').setFormula('=iferror(VLOOKUP(T4;daily_data!$D:$E;2;0);"")');
+    };
+}
+
+//--------------------------------------------------------------Save feedback------------------------------------------------------------------------------------------------------
+function syncData(){
+    // var email = Session.getActiveUser().getEmail()
+    // botAlertRunning(email,0)
+    var ss = SpreadsheetApp.getActive()
+    var masterAllSheets = getAllCollection1();
+    var db1 = ss.getSheetByName('DB1');
+    if(db1 == null){var db1 = ss.insertSheet('DB1')}else{db1.clear()}
+    var lr = 0
+      for (var z=0 ; z<masterAllSheets.length ; z++){
+        var sheetName = masterAllSheets[z];
+        var sheet = ss.getSheetByName(sheetName);
+        Logger.log(sheetName)
+        if (sheet.getLastRow() > 4){
+          var source = sheet.getRange(4,28, sheet.getLastRow()-3,5).getValues();
+          db1.getRange(lr+1,1,source.length,source[0].length).setValues(source);
+          var lr = db1.getLastRow()
+        }
+      };
+    var database = ss.getSheetByName('database');
+    if(database == null){var database = ss.insertSheet('database')}else{database.clear()}
+    Logger.log(db1.getLastRow())
+    if (db1.getLastRow()>1){
+      var source1 = db1.getRange(1,1, db1.getLastRow(),5).getValues();
+      database.getRange(1,1,source1.length,source1[0].length).setValues(source1);
+    }
+    // botAlertRunning(email,1) 
+  };
+//-------------------------------------FEEDBACK TO BD------------------------------------------------------------
+function feedbackToBd(){
+  var email = Session.getActiveUser().getEmail()
+  botAlertRunning(email,0)
+  feedback();
+  botAlertRunning(email,1)
+};
+function feedback(){
+  var masterSheet = SpreadsheetApp.getActive().getSheetByName('controller');
+  var lastRow = masterSheet.getLastRow();
+  var runningRange = masterSheet.getRange(2,8,6,1).getValues()
+  masterSheet.getRange(1,1,lastRow,1).clear()
+
+  var source = SpreadsheetApp.getActiveSpreadsheet();
+  var sourceRange = source.getSheetByName('database').getRange(1,1,source.getSheetByName('database').getLastRow(),5).getValues();
+  var filtered = sourceRange.filter(function (dataRow) {
+    return dataRow[4] != '';
+  });
+
+  for (var t = 2; t <= lastRow; t++){
+    var range = masterSheet.getRange(t,3,1,1);
+    var urlSource = range.getValue();
+    Logger.log(urlSource)
+    masterSheet.getRange(t,1,1,1).setValue(urlSource)
+
+    var feedback = SpreadsheetApp.openByUrl(urlSource).getSheetByName('feedback_campaign');
+    if(feedback == null){var feedback = SpreadsheetApp.openByUrl(urlSource).insertSheet('feedback_campaign')}else{feedback.clear()}
+
+    feedback.getRange(1,1,filtered.length, filtered[0].length).setValues(filtered)
+    for (var z = 0; z<6; z++){
+      var name = runningRange[z][0]
+      if (name != ''){
+        var sheet = SpreadsheetApp.openByUrl(urlSource).getSheetByName(name);
+        if (sheet!=null){
+          Logger.log(name)
+          if(sheet.getLastRow()>4){
+            Logger.log(sheet.getLastRow())
+            if(SpreadsheetApp.openByUrl(urlSource).getSpreadsheetLocale() == 'vi_VN'){
+              sheet.getRange("AH3").setValue(name);
+              sheet.getRange(4,28,1,1).setFormula("=$AH$3&R4&J4&G4");
+              sheet.getRange(4,28,1,1).copyTo(sheet.getRange(5,28,sheet.getLastRow()-4,1));
+              sheet.getRange(4,29,1,1).setFormula('=IFERROR(VLOOKUP(AB4;feedback_campaign!$A:$E;5;0);"")');
+              sheet.getRange(4,29,1,1).copyTo(sheet.getRange(5,29,sheet.getLastRow()-4,1));
+              sheet.getRange(4,30,1,1).setFormula('=IFERROR(VLOOKUP(AB4;feedback_campaign!$A:$E;3;0);"")');
+              sheet.getRange(4,30,1,1).copyTo(sheet.getRange(5,30,sheet.getLastRow()-4,1));
+            }
+            else{
+              sheet.getRange("AH3").setValue(name);
+              sheet.getRange(4,28,1,1).setFormula("=$AH$3&R4&J4&G4");
+              sheet.getRange(4,28,1,1).copyTo(sheet.getRange(5,28,sheet.getLastRow()-4,1));
+              sheet.getRange(4,29,1,1).setFormula('=IFERROR(VLOOKUP(AB4,feedback_campaign!$A:$E,5,0),"")');
+              sheet.getRange(4,29,1,1).copyTo(sheet.getRange(5,29,sheet.getLastRow()-4,1));
+              sheet.getRange(4,30,1,1).setFormula('=IFERROR(VLOOKUP(AB4,feedback_campaign!$A:$E,3,0),"")');
+              sheet.getRange(4,30,1,1).copyTo(sheet.getRange(5,30,sheet.getLastRow()-4,1));
+            }
+          }  
+        }
+      }
+    }
+  }
+  botRemindFeedback(runningRange)
+};
+// --------------------------------------------------- STORE DATA ----------------------------------------------------
+function clearColleaction(){
+  // status("Doing...take a tea and wait until Done.")
+  // setPer(allEmail());
+  // clearTmp(SpreadsheetApp.getActive().getUrl())
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert('LƯU Ý: Collection cũng sẽ bị xóa trong Gdoc của BD, các collection đã xóa sẽ được lưu trữ tại https://drive.google.com/drive/folders/1FeXzJNDA3unBhHbsA7yvQ6mgf2yY-Nk3?usp=sharing', ui.ButtonSet.YES_NO);
+
+  // Process the user's response.
+  if (response == ui.Button.YES) {
+    // update();
+    var ss = SpreadsheetApp.getActive()
+    var sheet = ss.getSheetByName('all_schemes');
+    var lastRow = sheet.getLastRow();
+    for (t=2; t<= lastRow; t++){
+      var status = sheet.getRange(t,5,1,1).getValue();
+      var botInput = sheet.getRange(t,6,1,1).getValue();
+      if((status == 'done')&(botInput == '')){
+        var name = sheet.getRange(t,1,1,1).getValue();
+        var folderId = '1FeXzJNDA3unBhHbsA7yvQ6mgf2yY-Nk3';
+        folder = DriveApp.getFolderById(folderId);
+        var ssStore = SpreadsheetApp.create(name + " " + Utilities.formatDate(new Date(), "GMT+7", "dd/MM/yyyy"));
+        DriveApp.getFileById(ssStore.getId()).moveTo(folder);
+        // var tmpSheet = ss.insertSheet('tmpStore');
+
+        var sourceSheet = ss.getSheetByName(name);
+        if(sourceSheet.getLastRow()>0){
+          var sourceRange = sourceSheet.getRange(1,1,sourceSheet.getLastRow(), sourceSheet.getLastColumn()).getValues();
+          // var desRange = tmpSheet.getRange(1,1,1,1);
+          // sourceRange.copyTo(desRange, SpreadsheetApp.CopyPasteType.PASTE_VALUES, false);
+          ssStore.getSheetByName('Sheet1').getRange(1,1,sourceRange.length,sourceRange[0].length).setValues(sourceRange)
+          // tmpSheet.copyTo(ssStore);
+          ss.deleteSheet(sourceSheet);
+          sheet.getRange(t,6,1,1).setValue('done');
+        }else{
+          ss.deleteSheet(sourceSheet);
+          sheet.getRange(t,6,1,1).setValue('done')
+        }
+
+        for (var i = 2; i <= ss.getSheetByName('controller').getLastRow(); i++){
+          var url = ss.getSheetByName('controller').getRange(i,3,1,1).getValue();
+          try{
+            var bdSheet = SpreadsheetApp.openByUrl(url).getSheetByName(name);
+            SpreadsheetApp.openByUrl(url).deleteSheet(bdSheet);
+          }catch(err){Logger.log(err)}
+        };
+        // SpreadsheetApp.getActive().deleteSheet(tmpSheet);
+      }
+    }
+  } else {}
+  // status("Done...Your turn")
+};
+
+function sendToProject(){
+  var ss = SpreadsheetApp.getActive()
+  var sheet = ss.getSheetByName("send_to_projector")
+  var lastrow = sheet.getLastRow()
+  var runningRange = sheet.getRange(2,1,lastrow-1,1).getValues()
+  Logger.log(runningRange)
+  var folderId = '1NY20j2P5WbIMtbWJDOwIfMCIjQ_zCaJs';
+  var folder = DriveApp.getFolderById(folderId);
+  Logger.log(runningRange.length)
+  for(var i= 0; i < runningRange.length; i++){
+    if(sheet.getRange(i+2,4,1,1).getValue()==""){
+      var name = runningRange[i][0]
+      Logger.log(name)
+      var campaignSheet = ss.getSheetByName(name)
+      if(campaignSheet != null){
+        var ssStore = SpreadsheetApp.create(name + " " + Utilities.formatDate(new Date(), "GMT+7", "dd/MM/yyyy"));
+        DriveApp.getFileById(ssStore.getId()).moveTo(folder);
+        var sourceSheet = ss.getSheetByName(name);
+        if(sourceSheet.getLastRow()>4){
+          var sourceRange = sourceSheet.getRange(1,1,sourceSheet.getLastRow(), sourceSheet.getLastColumn()).getValues();
+          //var filtered = sourceRange.filter(function (dataRow) {
+            //return (dataRow[31].toLowerCase() == 'pass')||(dataRow[31].toLowerCase()=="final_status");
+          //});
+          //var filtered1 = filtered.filter(function (dataRow) {
+            //return dataRow[5].toLowerCase() != 'brand';
+          //});
+          ssStore.getSheetByName('Sheet1').getRange(1,1,sourceRange.length,sourceRange[0].length).setValues(sourceRange) //thay bang data moi nhat
+          var sheetid = ssStore.getId()
+          Utilities.sleep(5*1000)
+          Logger.log(SpreadsheetApp.openById(sheetid).getSheetByName('Sheet1').getLastRow())
+          Logger.log(sheetid)
+          Utilities.sleep(5*1000)
+          sendcsv(sheetid, name)
+        }
+      }
+    }
+    sheet.getRange(i+2,4,1,1).setValue("done")
+  }
+  botRemindSendtoPJ(runningRange)
+}
+function sendcsv(id, collectionName) {
+  // sendToProject()
+  var ss = SpreadsheetApp.openById(id);
+  var sh1 = ss.getSheetByName('Sheet1');
+  var exportName1 = collectionName + '.csv';
+  var url1 = 'https://docs.google.com/spreadsheets/d/'+ss.getId()+'/export?exportFormat=csv&format=csv'
+  + '&size=A4'                           
+  + '&portrait=false'                     
+  + '&fitw=true' 
+  + '&top_margin=0.60'              
+  + '&bottom_margin=0.60'          
+  + '&left_margin=0.60'             
+  + '&right_margin=0.60'  
+  + '&sheetnames=false&printtitle=false' 
+  + '&pagenumbers=false&gridlines=false' 
+  + '&fzr=false'                         
+  + '&gid='+sh1.getSheetId();
+  var response1 = UrlFetchApp.fetch(url1, {
+    headers: {
+      'Authorization': 'Bearer ' +  ScriptApp.getOAuthToken()}
+  });
+  var blob1 = response1.getBlob().setName(exportName1);
+  MailApp.sendEmail({to: 'projector@foody.vn', //<<--------<<------EMAIL TO SEND TO
+                     cc: 'lethu.tran@foody.vn, tung.hoang@foody.vn,quynhnga.nguyen@foody.vn,vutien.do@foody.vn,linhchi.nguyen@foody.vn,chienthang.vu@foody.vn,dieulinh.dao@foody.vn,duongtung.nguyen@foody.vn,hoa.caothi@foody.vn,minhhieu.le@foody.vn,hongphuc.nguyen@foody.vn,thutrang.nguyen@foody.vn,nhatlinh.hoang@foody.vn,thithao.nguyen@foody.vn,bichngoc.dao@foody.vn,minhthanh.nguyen@foody.vn,vu.lehong@foody.vn,hoangphuong.trinh@foody.vn,hoabinh.dao@foody.vn,phuong.nguyentruc@foody.vn,tu.trananh@foody.vn,thao.nguyenkim@foody.vn,be.ngo@foody.vn,tancuong.huynh@foody.vn,xuantoan.nguyen@foody.vn,thanhtung.pham@foody.vn,dangkhoi.do@foody.vn,hoangdung.vo@foody.vn,anhphuong.do@foody.vn,minhtri.hohuynh@foody.vn,thuy.phamvan@foody.vn,linh.dothuy@foody.vn,dacminh.phamhong@foody.vn,thanhhue.le@foody.vn,trongthang.le@foody.vn,thuhuyen.nguyen@foody.vn,honganh.phan@foody.vn,ngoc.tranthikim@foody.vn,dat.nguyenphuoc@foody.vn,thuyngoc.nguyen@foody.vn,vietdung.tran@foody.vn,dinhtien.nguyen@foody.vn,quangkiet.vo@foody.vn,tanloc.le@foody.vn,anhoa.to@foody.vn,thile.pham@foody.vn,thientoan.tran@foody.vn,dung.nguyen@foody.vn,ngocanh.nguyen@foody.vn,thanhgiang.nguyen@foody.vn,quangphuc.lai@foody.vn,hongngoc.tran@foody.vn,vanhong.nguyen@foody.vn,huytrung.nguyen@foody.vn,theanh.quach@foody.vn,ngoclinh.tran@foody.vn,nhatlam.nguyen@foody.vn,sontung.mai@foody.vn,sontung.mai@foody.vn,anh.buithe@foody.vn,duchung.tran@foody.vn,quynhanh.tran@foody.vn,quocmanh.trinh@foody.vn,hoangly.nguyen@foody.vn,thichinh.nguyen@foody.vn,minhtung.luong@foody.vn,thanhson.trinh@foody.vn,thuylinh.nguyen@foody.vn,hoangnam.nguyen@foody.vn,ngoclong.nguyen@foody.vn,khanhha.nguyen@foody.vn,thuylinh.dang@foody.vn,tuananh.nguyenle@foody.vn,quangdoanh.nguyen@foody.vn,nhatnam.nguyen@foody.vn,kimthanh.luong@foody.vn,taiphong.nguyen@foody.vn,hongnhung.vu@foody.vn,thao.nguyenphuong@foody.vn,vanhung.dang@foody.vn,thanhtam.vo@foody.vn,dat.nguyenquoc@foody.vn,manhhung.le@foody.vn,vantam.lu@foody.vn,phuongngan.vu@foody.vn,quanghuy.nguyen@foody.vn,haiyen.nguyen@foody.vn,baotrung.pham@foody.vn,ngocanh.ngo@foody.vn,tuanhung.nguyen@foody.vn,huongly.hoang@foody.vn,thuyhuyen.dinh@foody.vn,hoainam.nguyen@foody.vn,vanhung.duong@foody.vn,baoquy.dao@foody.vn,bahung.nguyen@foody.vn,myhue.pham@foody.vn,ngocha.ly@foody.vn,duylong.hoang@foody.vn,minhthai.cao@foody.vn,tunglam.vi@foody.vn,phuongthao.tranthi@foody.vn,trieuduong.bui@foody.vn,thuthao.tranthi@foody.vn,quockhang.dao@foody.vn,nhuy.la@foody.vn,anhphuong.do@foody.vn,toan.tran@foody.vn,ngocquy.nguyen@foody.vn,quochoan.le@foody.vn,thanhphong.huynh@foody.vn,boimi.tran@foody.vn,duchuy.pham@foody.vn,huuthanh.nguyen@foody.vn,theanh.hoang@foody.vn,baomy.nguyen@foody.vn,ngocduyen.nguyenthi@foody.vn,phuonguyen.le@foody.vn,theduy.vu@foody.vn,phiyen.le@foody.vn,thehao.nguyen@foody.vn,khanhmy.le@foody.vn,thuytrang.dang@foody.vn,kimthu.le@foody.vn,tuananh.nguyenhoang@foody.vn,khanhduy.nguyen@foody.vn,ngan.nguyenmy@foody.vn,tuongvy.le@foody.vn,hoangduy.nguyen@foody.vn,phuongquynh.le@foody.vn,trucphuong.lu@foody.vn,thaonhi.tran@foody.vn,dinhhau.ho@foody.vn,minhdung.luong@foody.vn,congthanh.le@foody.vn,ngocdiep.tran@foody.vn,thutrinh.huynh@foody.vn,thanhhai.phan@foody.vn,minhngoc.nguyen@foody.vn,ducthinh.ha@foody.vn,ducmoc.bui@foody.vn,hoangan.nguyenvo@foody.vn,dung.donguyenthuy@foody.vn,tran.huynhbao@foody.vn,huy.vothanh@foody.vn,nhuy.nguyenthi@foody.vn,tuyen.nguyenngoc@foody.vn,tho.nguyenanh@foody.vn,nam.vubao@foody.vn,duy.thanbao@foody.vn,quyen.chetu@foody.vn,baoduy.hoang@foody.vn,honglien.nguyen@foody.vn,vanhieu.cao@foody.vn,tuyetngan.nguyen@foody.vn,vanhuy.vo@foody.vn,myduyen.do@foody.vn,thithao.duong@foody.vn,truongvu.nguyen@foody.vn,hoangthanh.doanngoc@foody.vn,thixuan.nguyen@foody.vn,ngocquang.nguyen@foody.vn,minhthu.nguyen@foody.vn,theduc.cao@foody.vn,phuocthang.le@foody.vn,phuc.le@foody.vn,minhquang.pham@foody.vn,ngochao.ly@foody.vn,trieu.nguyenhai@foody.vn,anhtrung.doan@foody.vn,quangthanh.hua@foody.vn,minhlam.ngo@foody.vn,huuphuc.tran@foody.vn,ngocman.nguyen@foody.vn,thanhbinh.le@foody.vn,vanan.nguyen@foody.vn,aman.le@foody.vn,quocduy.nguyen@foody.vn,quynhtram.le@foody.vn,vanquan.le@foody.vn,hongtham.nguyen@foody.vn,tram.nguyenngocminh@foody.vn',
+                     subject: '[NowFood] Collection need set up: '+ collectionName,//<<-------EMAIL SUBJECT
+                     body: 'Dear Projector team, đây là collection cần được set up trong D+3, mọi người support giúp em nhé. Nếu có issue gì mọi người có thể liên hệ team PX hoặc reply trên email này để PX support nhé.'
+                     ,//<<--------<<-----EMAIL BODY - I WOULD GENERALLY USE htmlBody BUT IN THIS CASE EDITED TO NOT GET TOO CONFUSING
+                    //  message: "Dear project team moi nguoi set up collction trong file đính kèm trong D+1 giúp em với nhé",
+                     name: 'Food Collection set up',//<<--------<<------<<-NAME THAT APPEARS WHEN EMAIL SENT
+                     //replyTo: 'lethu.tran@foody.vn, honglien.nguyen@foody.vn, baoduy.hoang@foody.vn',//<<--------<WHERE A REPLY TO THE EMAIL WILL GO
+                     attachments: [{
+                       fileName: exportName1,
+                       content: blob1.getBytes(),
+                       mimeType: "text/csv"}]
+                    });
+}
+function trial_email(){
+  sendcsv('https://docs.google.com/spreadsheets/d/1IM_YnYeR_NfRXudKkBX-N8Cf_IfOZ0bPqQXjqUZ1BFs/edit#gid=0', "pre hype")
+}
+//-----------------------------------------------------set permission---------------------------------------------------------
+function setPer(){
+  var editorList = Browser.inputBox('Vui lòng điền email của người bạn muốn set permission');
+  var masterSheet = SpreadsheetApp.getActive().getSheetByName('controller');
+  var lastRow = masterSheet.getLastRow();
+  // var editorList = ["nhuquynh.nguyen@foody.vn", "khanhtram.phan@foody.vn"]
+  for (var t = 2; t <= lastRow; t++){
+    try{
+      var url = masterSheet.getRange(t,3,1,1).getValue();
+      SpreadsheetApp.openByUrl(url).addEditor(editorList)
+      Logger.log(url)
+    }catch(err){Logger.log(err)}
+  };
+  DriveApp.getFolderById('1FeXzJNDA3unBhHbsA7yvQ6mgf2yY-Nk3').addEditor(editorList);
+  // DriveApp.getFolderById('1ta61Ka_3-b96P-L1Ppc1KYfux3bPP-ll').addEditor(editorList);
+  // lockData();
+}
+// --------------------------------------------------- SUPPORTING FUNCTION ----------------------------------------------------
+// function createSheet(){
+//   var name = 'feedback_campaign'
+//   var ss = SpreadsheetApp.getActive()
+//   // var sheet = ss.getSheetByName(name)
+//   //--------------------------------prepare------------
+//   var sheets = allSheet()
+//   for (i = 0; i< sheets.length; i++){
+//     var url = sheets[i]
+//     Logger.log(url)
+//     var bdSS = SpreadsheetApp.openByUrl(url)
+//     ss.getSheetByName(name).copyTo(bdSS).setName(name)
+//   }
+// };
+function botRemindSendtoPJ(sheetName) {
+  var str = "Collection " + sheetName + " đã được gửi cho Projector set up, mn check email nhé"
+  var data = {
+    "tag": "text",
+    "text": {"content":str},
+    "at_all": true
+  };
+  var options = {
+    'method' : 'post',
+    'contentType': 'application/json',
+    'payload' : JSON.stringify(data)
+  };
+  UrlFetchApp.fetch('https://openapi.seatalk.io/webhook/group/3WLVS5_cQRGYD5gddYXnsg', options);
+}
+function botRemindFeedback(sheetName) {
+  var str = "Collection " + sheetName + " đã được MKT scan và feedback, mọi người vào check giúp em nhé"
+  var data = {
+    "tag": "text",
+    "text": {"content":str},
+    "at_all": true
+  };
+  var options = {
+    'method' : 'post',
+    'contentType': 'application/json',
+    'payload' : JSON.stringify(data)
+  };
+  UrlFetchApp.fetch('https://openapi.seatalk.io/webhook/group/3WLVS5_cQRGYD5gddYXnsg', options);
+}
+
+function botRemindCreate(sheetName) {
+  var str = "Collection " + sheetName + " đã được MKT tạo, mọi người vào check và điền deal giúp em nhé"
+  var data = {
+    "tag": "text",
+    "text": {"content":str},
+    "at_all": true
+  };
+  var options = {
+    'method' : 'post',
+    'contentType': 'application/json',
+    'payload' : JSON.stringify(data)
+  };
+  UrlFetchApp.fetch('https://openapi.seatalk.io/webhook/group/3WLVS5_cQRGYD5gddYXnsg', options);
+}
+function botAlertRunning(email,type) {
+  if(type == 0){
+    var str = "User " + email + " đang thực hiện một vài thao tác trên file: MKT Master file - campaign. Lưu ý không run script trong lúc này, trong trường hợp cần gấp hãy hỏi " + email + " để chắc chắn bạn không run trên cùng collection"
+  }
+  else {
+    var str = "Tác vụ của " + email + " đã được thực hiện xong trên file: MKT Master file - campaign. Khoan dừng lại khoản chừng là 2 phút để xem " + email + " có thực hiện gì thêm không trước khi đến lượt bạn nhé!"   
+  }
+  var data = {
+    "tag": "text",
+    "text": {"content":str},
+    "at_all": true
+  };
+  var options = {
+    'method' : 'post',
+    'contentType': 'application/json',
+    'payload' : JSON.stringify(data)
+  };
+  UrlFetchApp.fetch('https://openapi.seatalk.io/webhook/group/TCUnQPg3QwSjZO_0vkW_HQ', options);
+}
+
+function warning(){
+  var ss = SpreadsheetApp.getActive()
+  var sheet = ss.getSheetByName("all_schemes")
+  var lr = sheet.getLastRow()
+  var expirationList = []
+  var urgentList = []
+  for (var i = 2; i<= lr; i++){
+    var targetDate = sheet.getRange(i,3,1,1)
+    var targetStatus = sheet.getRange(i,5,1,1).getValue()
+    if(targetDate.getValue() != ''){
+      // expirationList.push(parseInt(Utilities.formatDate(targetDate.getValue(), "GMT+7", "yyyyMMdd")))
+      var lockDate = parseInt(Utilities.formatDate(targetDate.getValue(), "GMT+7", "yyyyMMdd"))
+      var currentDate = parseInt(Utilities.formatDate(new Date(), "GMT+7", "yyyyMMdd"))
+      if ((lockDate == (currentDate + 1))&&(targetStatus != 'done')){
+        expirationList.push(sheet.getRange(i,1,1,1).getValue())
+      }
+      if ((lockDate == (currentDate))&&(targetStatus != 'done')){
+        urgentList.push(sheet.getRange(i,1,1,1).getValue())
+      }      
+    }
+  }
+  if (expirationList.length > 0){
+    var str = "Các collection sau sẽ hể hạng điền vào ngày mai mọi người nhanh chóng điền deal giúp em nhé: " + expirationList
+    var data = {
+      "tag": "text",
+      "text": {"content":str},
+      "at_all": true
+    };
+    var options = {
+      'method' : 'post',
+      'contentType': 'application/json',
+      'payload' : JSON.stringify(data)
+    };
+    UrlFetchApp.fetch('https://openapi.seatalk.io/webhook/group/3WLVS5_cQRGYD5gddYXnsg', options);
+  }
+  if (urgentList.length > 0){
+    var str = "CÁC COLLECTIONS SAU SẼ CHỐT VÀO HÔM NAY MỌI NGƯỜI ĐIỀN NHANH GIÚP EM NHÉ: " + urgentList
+    var data = {
+      "tag": "text",
+      "text": {"content":str},
+      "at_all": true
+    };
+    var options = {
+      'method' : 'post',
+      'contentType': 'application/json',
+      'payload' : JSON.stringify(data)
+    };
+    UrlFetchApp.fetch('https://openapi.seatalk.io/webhook/group/3WLVS5_cQRGYD5gddYXnsg', options);
+  }
+}
